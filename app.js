@@ -3,9 +3,12 @@ const express = require('express')
 // const restaurants = require('./restaurant.json')
 const Restaurant = require('./models/restaurant')
 const app = express()
-const port = 3000
+const port = 3001
 const bodyParser = require('body-parser')
 const exhbs = require('express-handlebars')
+
+const ObjectId = require('mongoose').Types.ObjectId
+
 const mongoose = require('mongoose')
 mongoose.connect('mongodb://localhost/restaurant-list', { useNewUrlParser: true, useUnifiedTopology: true })
 app.engine('handlebars', exhbs({ defaultLayout: 'main' }))
@@ -32,7 +35,6 @@ app.get('/', (req, res) => {
   Restaurant.find()
     .lean()
     .then(restaurant => res.render('index', { restaurants: restaurant }))
-
     .catch(error => console.log(error))
 })
 
@@ -47,6 +49,12 @@ app.get('/restaurants/searches', (req, res) => {
   return Restaurant.find({ $or: [{ 'name': { $regex: keyword } }, { 'category': { $regex: keyword } }] })
     .lean()
     .then(restaurant => {
+      if (restaurant.length === 0) {
+        console.log('無符合搜尋結果')
+        res.render('index', {
+          restaurants: restaurant, errorMsg: '無符合搜尋結果'
+        })
+      }
       res.render('index', { restaurants: restaurant, keyword: req.query.keyword })
     })
     .catch(error => console.log(error))
@@ -57,6 +65,12 @@ app.get('/restaurants/searches', (req, res) => {
 //index
 app.get('/restaurants/:id', (req, res) => {
   const id = req.params.id
+  if (!ObjectId.isValid(id)) {
+    return res.render('index', {
+      errorMsg: '讀取失敗:Not a valid id'
+    })
+  }
+
   return Restaurant.findById(id)
     .lean()
     .then(restaurant => {
@@ -97,8 +111,6 @@ app.post('/restaurants/:id/edit', (req, res) => {
 })
 
 //create
-
-
 app.post('/restaurants', (req, res) => {
   const { name, name_en, category, image, location, phone, google_map, rating, description } = req.body
   return Restaurant.create({ name, name_en, category, image, location, phone, google_map, rating, description })
@@ -109,6 +121,11 @@ app.post('/restaurants', (req, res) => {
 //delete
 app.post('/restaurants/:id/delete', (req, res) => {
   const id = req.params.id
+  if (!ObjectId.isValid(id)) {
+    return res.render('index', {
+      errorMsg: '刪除失敗:Not a valid id'
+    })
+  }
   return Restaurant.findById(id)
     .then(restaurant => { restaurant.remove() })
     .then(() => res.redirect('/'))
